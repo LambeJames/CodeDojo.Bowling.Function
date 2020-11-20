@@ -2,20 +2,11 @@
 
 module BowlingCalculator =
 
-    let rec calculateScore rolls totalScore frame =
-        match rolls with
-        // Frame 10 strike
-        | 10 :: second :: third :: tail when frame = 10 -> totalScore + 10 + second + third
-        // Frame 10 spare
-        | first :: second :: third :: tail when first + second = 10 && frame = 10 -> totalScore + 10 + third
-        // Strike
-        | 10 :: second :: third :: tail -> calculateScore (second :: third :: tail) (totalScore + 10 + second + third) (frame + 1)
-        // Spare
-        | first :: second :: third :: tail when first + second = 10 -> calculateScore (third :: tail) (totalScore + 10 + third) (frame + 1)
-        // None spare strike
-        | first :: second :: tail -> calculateScore tail (totalScore + first + second) (frame + 1)
-        //Empty array
-        | [] -> totalScore
+    open Microsoft.AspNetCore.Http
+    open System.IO
+    open Newtonsoft.Json
+    open Microsoft.Extensions.Logging
+    open Microsoft.Azure.WebJobs
 
     let calcScore pins =
 
@@ -45,4 +36,21 @@ module BowlingCalculator =
             | _ -> 0
 
         calcScore pins 1
+
+    [<FunctionName("CalculateScore")>]
+    let Run ([<HttpTrigger(Methods=[|"POST"|])>] req:HttpRequest) (log:ILogger) =
+        async {
+            "Runnning Function"
+            |> log.LogInformation
+
+            let! body = 
+                new StreamReader(req.Body) 
+                |> (fun stream -> stream.ReadToEndAsync()) 
+                |> Async.AwaitTask
+
+            let rolls = JsonConvert.DeserializeObject<int list>(body)
+            let totalScore = calcScore rolls
+
+            return Ok(totalScore)
+        } |> Async.StartAsTask 
 
